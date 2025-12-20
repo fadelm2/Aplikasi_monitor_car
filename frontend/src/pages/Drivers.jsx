@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { driversAPI } from '../services/api'
-import { Users, Plus, Search, Edit2, Trash2, X, Loader2, Phone, CreditCard } from 'lucide-react'
+import {
+    Users, Plus, Search, Edit2, Trash2, X,
+    Loader2, Phone, CreditCard, ChevronLeft, ChevronRight // Tambah icon arrow
+} from 'lucide-react'
 
 const statusColors = {
     ACTIVE: 'bg-green-500/20 text-green-400',
@@ -26,10 +29,18 @@ function Modal({ isOpen, onClose, title, children }) {
 }
 
 export default function Drivers() {
+    // State Data & Loading
     const [drivers, setDrivers] = useState([])
     const [loading, setLoading] = useState(true)
+
+    // State Pagination & Filter
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
+    const [page, setPage] = useState(1)          // Halaman saat ini
+    const [totalPages, setTotalPages] = useState(1) // Total halaman dari API
+    const limit = 9 // Jumlah data per halaman (9 pas untuk grid 3 kolom)
+
+    // State Modal & Form
     const [modalOpen, setModalOpen] = useState(false)
     const [editingDriver, setEditingDriver] = useState(null)
     const [formData, setFormData] = useState({
@@ -37,14 +48,30 @@ export default function Drivers() {
     })
     const [saving, setSaving] = useState(false)
 
+    // Fetch data setiap kali page, search, atau filter berubah
     useEffect(() => {
         fetchDrivers()
-    }, [search, statusFilter])
+    }, [page, search, statusFilter])
 
     const fetchDrivers = async () => {
+        setLoading(true)
         try {
-            const response = await driversAPI.getAll({ limit: 100, search, status: statusFilter })
+            // Kirim parameter page dan limit ke API
+            const response = await driversAPI.getAll({
+                page,
+                limit,
+                search,
+                status: statusFilter
+            })
+
             setDrivers(response.data.data || [])
+
+            // ASUMSI: Backend mengembalikan meta pagination.
+            // Sesuaikan 'response.data.meta' dengan struktur response backend Abang.
+            // Contoh struktur: { data: [...], meta: { total_pages: 5, ... } }
+            const meta = response.data
+            setTotalPages(meta?.total_pages || 1)
+            console.log(response)
         } catch (error) {
             console.error('Failed to fetch drivers:', error)
         } finally {
@@ -52,6 +79,27 @@ export default function Drivers() {
         }
     }
 
+    // Handler Filter (Reset page ke 1 saat filter berubah)
+    const handleSearchChange = (e) => {
+        setSearch(e.target.value)
+        setPage(1)
+    }
+
+    const handleStatusChange = (e) => {
+        setStatusFilter(e.target.value)
+        setPage(1)
+    }
+
+    // Handler Pagination
+    const handlePrevPage = () => {
+        if (page > 1) setPage(page - 1)
+    }
+
+    const handleNextPage = () => {
+        if (page < totalPages) setPage(page + 1)
+    }
+
+    // --- CRUD Handlers (Tidak berubah) ---
     const handleSubmit = async (e) => {
         e.preventDefault()
         setSaving(true)
@@ -87,7 +135,12 @@ export default function Drivers() {
         if (!confirm('Yakin ingin menghapus supir ini?')) return
         try {
             await driversAPI.delete(id)
-            fetchDrivers()
+            // Cek jika halaman kosong setelah hapus, mundur 1 halaman
+            if (drivers.length === 1 && page > 1) {
+                setPage(page - 1)
+            } else {
+                fetchDrivers()
+            }
         } catch (error) {
             alert(error.response?.data?.error || 'Gagal menghapus')
         }
@@ -100,7 +153,7 @@ export default function Drivers() {
     }
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in pb-10">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Manajemen Supir</h1>
@@ -123,14 +176,14 @@ export default function Drivers() {
                         type="text"
                         placeholder="Cari nama, nomor HP, SIM..."
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        onChange={handleSearchChange} // Pakai handler baru
                         className="w-full pl-10 pr-4 py-2 bg-dark-200 border border-gray-700 rounded-lg
               text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
                     />
                 </div>
                 <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={handleStatusChange} // Pakai handler baru
                     className="px-4 py-2 bg-dark-200 border border-gray-700 rounded-lg text-white
             focus:outline-none focus:border-primary-500"
                 >
@@ -149,46 +202,73 @@ export default function Drivers() {
                 <div className="glass rounded-xl p-8 text-center">
                     <Users size={48} className="mx-auto mb-4 text-gray-600" />
                     <h3 className="text-xl font-semibold text-white mb-2">Belum ada data supir</h3>
-                    <p className="text-gray-400">Klik tombol "Tambah Supir" untuk menambahkan</p>
+                    <p className="text-gray-400">
+                        {search || statusFilter ? 'Coba ubah filter pencarian' : 'Klik tombol "Tambah Supir" untuk menambahkan'}
+                    </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {drivers.map(driver => (
-                        <div key={driver.id} className="glass rounded-xl p-6 card-hover">
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-primary-600/20 flex items-center justify-center">
-                                        <Users size={24} className="text-primary-400" />
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {drivers.map(driver => (
+                            <div key={driver.id} className="glass rounded-xl p-6 card-hover">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-full bg-primary-600/20 flex items-center justify-center">
+                                            <Users size={24} className="text-primary-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-white">{driver.name}</h3>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[driver.status]}`}>
+                                                {driver.status === 'ACTIVE' ? 'Aktif' : 'Off Duty'}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-white">{driver.name}</h3>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[driver.status]}`}>
-                                            {driver.status === 'ACTIVE' ? 'Aktif' : 'Off Duty'}
-                                        </span>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => handleEdit(driver)} className="p-2 text-gray-400 hover:text-primary-400">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button onClick={() => handleDelete(driver.id)} className="p-2 text-gray-400 hover:text-red-400">
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="flex gap-1">
-                                    <button onClick={() => handleEdit(driver)} className="p-2 text-gray-400 hover:text-primary-400">
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <button onClick={() => handleDelete(driver.id)} className="p-2 text-gray-400 hover:text-red-400">
-                                        <Trash2 size={16} />
-                                    </button>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <Phone size={14} />
+                                        <span>{driver.phone_number || '-'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <CreditCard size={14} />
+                                        <span>SIM: {driver.license_number || '-'}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2 text-gray-400">
-                                    <Phone size={14} />
-                                    <span>{driver.phone_number || '-'}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-gray-400">
-                                    <CreditCard size={14} />
-                                    <span>SIM: {driver.license_number || '-'}</span>
-                                </div>
-                            </div>
+                        ))}
+                    </div>
+
+                    {/* Pagination Controls */}
+                    <div className="flex items-center justify-between border-t border-gray-700 pt-4 mt-6">
+                        <span className="text-sm text-gray-400">
+                            Halaman <span className="text-white font-medium">{page}</span> dari <span className="text-white font-medium">{totalPages}</span>
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handlePrevPage}
+                                disabled={page === 1 || loading}
+                                className="p-2 rounded-lg bg-dark-200 border border-gray-700 text-gray-400 hover:text-white hover:bg-dark-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <ChevronLeft size={20} />
+                            </button>
+                            <button
+                                onClick={handleNextPage}
+                                disabled={page === totalPages || loading}
+                                className="p-2 rounded-lg bg-dark-200 border border-gray-700 text-gray-400 hover:text-white hover:bg-dark-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <ChevronRight size={20} />
+                            </button>
                         </div>
-                    ))}
-                </div>
+                    </div>
+                </>
             )}
 
             {/* Modal */}

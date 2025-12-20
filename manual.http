@@ -1,0 +1,2 @@
+### GET request to example server
+PUT http://localhost:3000/car/201/location
