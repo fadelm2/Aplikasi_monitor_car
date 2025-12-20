@@ -107,6 +107,6 @@ func (r *tripRepository) EndTrip(id int64, endKm int, notes string) error {
 	return r.db.Model(&entity.TripLog{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"end_time": now,
 		"end_km":   endKm,
-		"notes":    gorm.Expr("CONCAT(notes, ?)", "\n"+notes),
+		"notes":    gorm.Expr("CONCAT(notes, ?::text)", "\n"+notes),
 	}).Error
 }
