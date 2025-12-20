@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import { carsAPI } from '../services/api'
-import { Car, RefreshCw, MapPin } from 'lucide-react'
+import { Car, RefreshCw, MapPin, Search } from 'lucide-react' // Tambah icon Search
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -45,6 +45,7 @@ export default function LiveMonitor() {
     const [cars, setCars] = useState([])
     const [loading, setLoading] = useState(true)
     const [lastUpdate, setLastUpdate] = useState(new Date())
+    const [searchQuery, setSearchQuery] = useState('') // State untuk pencarian
 
     useEffect(() => {
         fetchCars()
@@ -65,37 +66,63 @@ export default function LiveMonitor() {
         }
     }
 
-    // Filter cars with location
+    // 1. Filter cars yang punya lokasi dulu
     const carsWithLocation = cars.filter(car => car.last_lat && car.last_lng)
+
+    // 2. Filter berdasarkan search query (Plat atau Nama Supir)
+    const filteredCars = carsWithLocation.filter(car => {
+        const query = searchQuery.toLowerCase()
+        const matchPlate = car.license_plate?.toLowerCase().includes(query)
+        // Gunakan optional chaining (?.) untuk jaga-jaga jika current_driver null
+        const matchDriver = car.current_driver?.name?.toLowerCase().includes(query)
+
+        return matchPlate || matchDriver
+    })
 
     // Default center (Jakarta)
     const defaultCenter = [-6.2088, 106.8456]
+    // Center map ke mobil pertama yang ditemukan (jika ada), kalau tidak ke default
     const center = carsWithLocation.length > 0
         ? [carsWithLocation[0].last_lat, carsWithLocation[0].last_lng]
         : defaultCenter
 
     return (
         <div className="space-y-6 animate-fade-in h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+            {/* Header & Controls */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Live Monitoring</h1>
                     <p className="text-gray-400 mt-1">
-                        Pantau lokasi armada secara realtime • Update terakhir: {lastUpdate.toLocaleTimeString('id-ID')}
+                        Pantau lokasi armada secara realtime • Update: {lastUpdate.toLocaleTimeString('id-ID')}
                     </p>
                 </div>
-                <button
-                    onClick={fetchCars}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg
-            hover:bg-primary-500 transition-colors disabled:opacity-50"
-                >
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                    Refresh
-                </button>
+
+                <div className="flex items-center gap-3">
+                    {/* Search Input */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Cari plat atau supir..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full md:w-64"
+                        />
+                    </div>
+
+                    <button
+                        onClick={fetchCars}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg
+                        hover:bg-primary-500 transition-colors disabled:opacity-50 whitespace-nowrap"
+                    >
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
-            {/* Legend */}
+            {/* Legend & Stats */}
             <div className="flex flex-wrap items-center gap-4">
                 {Object.entries(statusColors).map(([status, color]) => (
                     <div key={status} className="flex items-center gap-2">
@@ -106,14 +133,14 @@ export default function LiveMonitor() {
                         <span className="text-gray-400 text-sm">{statusLabels[status]}</span>
                     </div>
                 ))}
-                <span className="text-gray-500 text-sm ml-4">
-                    {carsWithLocation.length} mobil dengan lokasi GPS
+                <span className="text-gray-500 text-sm ml-auto font-medium">
+                    Menampilkan {filteredCars.length} dari {carsWithLocation.length} unit
                 </span>
             </div>
 
             {/* Map */}
             <div className="glass rounded-xl p-2 h-[calc(100vh-280px)] min-h-[400px]">
-                {loading ? (
+                {loading && cars.length === 0 ? ( // Loading awal saja
                     <div className="flex items-center justify-center h-full">
                         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
                     </div>
@@ -128,7 +155,8 @@ export default function LiveMonitor() {
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-                        {carsWithLocation.map((car) => (
+                        {/* Render markers berdasarkan filteredCars */}
+                        {filteredCars.map((car) => (
                             <Marker
                                 key={car.id}
                                 position={[car.last_lat, car.last_lng]}
@@ -170,13 +198,16 @@ export default function LiveMonitor() {
                 )}
             </div>
 
-            {/* Empty state */}
-            {!loading && carsWithLocation.length === 0 && (
+            {/* Empty state filter result */}
+            {!loading && filteredCars.length === 0 && (
                 <div className="glass rounded-xl p-8 text-center">
-                    <MapPin size={48} className="text-gray-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-white mb-2">Belum ada data lokasi</h3>
+                    <Search size={48} className="text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">Tidak ditemukan</h3>
                     <p className="text-gray-400">
-                        Lokasi GPS mobil akan muncul di peta setelah data lokasi diperbarui
+                        {searchQuery
+                            ? `Tidak ada mobil dengan kata kunci "${searchQuery}"`
+                            : "Belum ada data lokasi GPS yang tersedia"
+                        }
                     </p>
                 </div>
             )}
