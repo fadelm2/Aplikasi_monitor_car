@@ -1,7 +1,7 @@
 -- 1. Insert 1 Akun Admin Default
 INSERT INTO users (username, password, role)
 VALUES
-    ('admin_fadel', '$2a$10$X7.p...hash_bcrypt_contoh...', 'admin')
+    ('admin_fadel', '$2a$10$Z4MR5mDWzrDxVCCasdu5VeTf5DbYcsyMb/aMeP4BlDFoOeLO2.R9y', 'admin')
     ON CONFLICT DO NOTHING; -- Jaga-jaga kalau run ulang biar gak error duplicate
 
 -- 2. Insert 100 Drivers Dummy

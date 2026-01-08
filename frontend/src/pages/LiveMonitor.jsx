@@ -50,7 +50,7 @@ export default function LiveMonitor() {
     useEffect(() => {
         fetchCars()
         // Refresh every 30 seconds
-        const interval = setInterval(fetchCars, 30000)
+        const interval = setInterval(fetchCars, 1000)
         return () => clearInterval(interval)
     }, [])
 
@@ -169,6 +169,7 @@ export default function LiveMonitor() {
                                             <span className="font-bold text-lg">{car.license_plate}</span>
                                         </div>
                                         <div className="space-y-1 text-sm">
+                                            <p><strong>Car ID:</strong> {car.id} </p>
                                             <p><strong>Mobil:</strong> {car.brand} {car.model}</p>
                                             <p><strong>Tahun:</strong> {car.year}</p>
                                             <p>
